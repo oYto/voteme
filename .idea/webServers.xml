@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="3e722539-a7f4-44f2-99be-e0902fee19df" name="lmx">
+        <fileTransfer rootFolder="/root/Voteme" accessType="SFTP" host="47.92.151.211" port="22" sshConfigId="87dd486e-fb90-46d6-80d9-250983d609e2" sshConfig="root@47.92.151.211:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
