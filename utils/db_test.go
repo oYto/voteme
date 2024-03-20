@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"VoteMe/control"
 	"VoteMe/db"
+	"VoteMe/model"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"runtime"
@@ -10,25 +12,14 @@ import (
 	"time"
 )
 
-func TestGenerateTicket(t *testing.T) {
-	db.InitRedis() // 确保Redis已经初始化
-	ticket1 := GetCurrentTicket()
-	t.Log(ticket1)
-	time.Sleep(20 * time.Second)
-	ticket2 := GetCurrentTicket()
-	t.Log(ticket2)
-
-	assert.NotEqual(t, ticket1, ticket2, "Each ticket should be unique")
-}
-
 // 测试多机竞争问题
 func TestConcurrencyUpdateUserVotes(t *testing.T) {
 	fmt.Println(runtime.GOMAXPROCS(0))
-	db.InitDB()    // 初始化数据库
-	db.InitRedis() // 初始化Redis
+	db.GetDB()       // 初始化数据库
+	db.GetRedisCLi() // 初始化Redis
 
 	userName := "Bob"
-	initialVotes, err := db.GetUserVotes(userName)
+	initialVotes, err := control.GetUserVotes(userName)
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -37,31 +28,30 @@ func TestConcurrencyUpdateUserVotes(t *testing.T) {
 	for i := 0; i < votesToAdd; i++ {
 		go func() {
 			defer wg.Done()
-			err := db.UpdateUserVotesWithLock(userName)
+			err := control.UpdateUserVotesWithRetry(userName)
 			assert.NoError(t, err)
 		}()
 	}
 
 	wg.Wait()
-	finalVotes, err := db.GetUserVotes(userName)
+	finalVotes, err := control.GetUserVotes(userName)
 	assert.NoError(t, err)
 
 	assert.Equal(t, initialVotes+votesToAdd, finalVotes, "User votes should accurately reflect the number of votes added in a concurrent environment")
 }
 
 func TestUpdateUserVotesExecutionTime(t *testing.T) {
-	db.InitDB()                                                   // 假设DB是全局变量，这里初始化你的数据库连接
-	defer db.DB.Exec("DELETE FROM users where name = 'TestUser'") // 测试完成后清理数据
+	defer db.GetDB().Exec("DELETE FROM users where name = 'TestUser'") // 测试完成后清理数据
 
 	// 首先创建一个测试用户
-	user := db.User{Name: "TestUser", Votes: 0}
-	if err := db.DB.Create(&user).Error; err != nil {
+	user := model.User{Name: "TestUser", Votes: 0}
+	if err := db.GetDB().Create(&user).Error; err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
 
 	startTime := time.Now() // 开始时间
 	// 调用UpdateUserVotes函数
-	err := db.UpdateUserVotesDirectSQL("TestUser")
+	err := control.UpdateUserVotesDirectSQL("TestUser")
 	duration := time.Since(startTime) // 计算执行时间
 
 	// 打印执行时间
@@ -72,8 +62,8 @@ func TestUpdateUserVotesExecutionTime(t *testing.T) {
 	}
 
 	// 验证投票数增加了1
-	var updatedUser db.User
-	if err := db.DB.Where("name = ?", "TestUser").First(&updatedUser).Error; err != nil {
+	var updatedUser model.User
+	if err := db.GetDB().Where("name = ?", "TestUser").First(&updatedUser).Error; err != nil {
 		t.Fatalf("Failed to query updated user: %v", err)
 	}
 

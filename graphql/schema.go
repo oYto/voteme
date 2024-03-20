@@ -1,7 +1,7 @@
 package graphql
 
 import (
-	"VoteMe/db"    // 导入db包用于数据库操作
+	"VoteMe/control"
 	"VoteMe/utils" // 导入utils包用于获取当前票据
 	"fmt"
 	"github.com/graphql-go/graphql" // 导入graphql包用于创建GraphQL服务
@@ -54,7 +54,7 @@ var queryType = graphql.NewObject(
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) { // 解析函数
 					name, _ := params.Args["name"].(string)
-					votes, err := db.GetUserVotes(name) // 调用数据库操作获取票数
+					votes, err := control.GetUserVotes(name) // 调用数据库操作获取票数
 					if err != nil {
 						return nil, fmt.Errorf("error getting votes for user %s: %s", name, err)
 					}
@@ -101,7 +101,7 @@ var mutationType = graphql.NewObject(
 					//}
 
 					ticketID, _ := params.Args["ticket"].(string)
-					_, err := db.CreateOrUpdateTicket(ticketID)
+					_, err := control.CreateOrUpdateTicket(ticketID)
 					if err != nil {
 						return false, err
 					}
@@ -112,12 +112,13 @@ var mutationType = graphql.NewObject(
 						if !ok {
 							return false, fmt.Errorf("invalid name type")
 						}
-						err := db.UpdateUserVotesWithLock(name) // 调用数据库操作增加票数
+						// 1：使用redis分布式锁，UpdateUserVotesWithLock
+						// 2：使用乐观锁，UpdateUserVotesWithRetry
+						err := control.UpdateUserVotesWithRetry(name) // 调用数据库操作增加票数
 						if err != nil {
 							return false, err
 						}
 					}
-
 					return true, nil // 如果所有操作成功，返回true
 				},
 			},

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"VoteMe/config"
 	"math/rand"
 	"sync"
 	"time"
@@ -11,8 +12,8 @@ var (
 	ticketMutex   sync.Mutex // ticketMutex是一个互斥锁，用于控制对currentTicket变量的并发访问
 )
 
-// 初始化票据生成器
-func init() {
+// Init 初始化票据生成器
+func Init() {
 	rand.Seed(time.Now().UnixNano())
 	go ticketGenerator()
 }
@@ -21,7 +22,7 @@ func init() {
 // todo 这里为了方便测试，设置了20秒，后续改为需求中的2s
 func ticketGenerator() {
 	currentTicket = generateRandomString(10)
-	ticker := time.NewTicker(200 * time.Second)
+	ticker := time.NewTicker(config.TicketsUpdateTime)
 	for range ticker.C { // 循环监听定时器的通道
 		ticketMutex.Lock()                       // 在修改currentTicket之前加锁
 		currentTicket = generateRandomString(10) // 生成一个长度为10的随机字符串作为新票据

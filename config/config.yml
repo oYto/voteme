@@ -1,0 +1,21 @@
+app:
+  app_name: "Voteme" # 应用名称
+  port: 9090    # 服务启用端口
+
+db:
+  host: "47.92.151.211"     # host
+  port: 13306          # port
+  user: "root"        # user
+  password: "123456"  # password
+  dbname: "voteme"    # dbname
+
+
+redis:
+  rhost: "47.92.151.211"
+  rport: 16379
+  rdb: 0
+  passwd: ''
+  poolsize: 1000
+
+maxVotes: 10000 # 一个票据最大投票次数
+ticketUpdateTime: 200s # 一个票据的失效时间

@@ -1,46 +1,13 @@
-package db
+package control
 
 import (
+	"VoteMe/config"
+	"VoteMe/db"
+	"VoteMe/model"
 	"fmt"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	"log"
 	"math/rand"
 	"time"
 )
-
-var DB *gorm.DB
-
-// User 定义用户模型
-type User struct {
-	gorm.Model        // 内嵌gorm.Model，包含ID、CreatedAt、UpdatedAt等
-	Name       string `gorm:"unique"` // 用户名字段，设置为唯一
-	Votes      int    // 票数字段
-	Version    int    // 添加版本号字段
-}
-
-// Ticket 在db_manager.go中添加Ticket结构体
-type Ticket struct {
-	gorm.Model
-	TicketID  string `gorm:"uniqueIndex"`
-	Uses      int    `gorm:"default:0"`
-	CreatedAt time.Time
-}
-
-// InitDB 初始化数据库连接
-func InitDB() {
-	var err error
-	// 数据源
-	dsn := "root:123456@tcp(47.92.151.211:13306)/voteme?charset=utf8mb4&parseTime=True&loc=Local"
-	// 使用gorm.Open创建数据库连接
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err) // 连接失败，记录日志并终止程序
-	}
-
-	// 在InitDB函数中添加Ticket自动迁移
-	//DB.AutoMigrate(&User{}, &Ticket{})
-}
 
 // UpdateUserVotes 更新用户票数
 // 接受一个用户名作为参数，将该用户的票数增加1
@@ -60,7 +27,7 @@ func InitDB() {
 func UpdateUserVotes(userName string) error {
 	// 构建并执行一个SQL更新语句来直接增加用户的票数
 	// 这里假设用户表名为`users`，并且有`name`和`votes`列
-	result := DB.Exec("UPDATE users SET votes = votes + 1 WHERE name = ?", userName)
+	result := db.GetDB().Exec("UPDATE users SET votes = votes + 1 WHERE name = ?", userName)
 
 	if result.Error != nil {
 		return result.Error // 如果执行SQL语句出错，返回错误
@@ -93,38 +60,38 @@ func UpdateUserVotesWithRetry(userName string) error {
 }
 
 // UpdateUserVotesOptimistically for update 6 毫秒
-func UpdateUserVotesOptimistically(userName string) error {
-	// 开启一个事务
-	tx := DB.Begin()
+//func UpdateUserVotesOptimistically(userName string) error {
+//	// 开启一个事务
+//	tx := db.GetDB().Begin()
+//
+//	var user model.User
+//	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("name = ?", userName).First(&user).Error; err != nil {
+//		tx.Rollback() // 回滚事务
+//		return err
+//	}
+//
+//	// 更新操作
+//	user.Votes++
+//	if err := tx.Save(&user).Error; err != nil {
+//		tx.Rollback() // 回滚事务
+//		return err
+//	}
+//
+//	// 提交事务
+//	return tx.Commit().Error
+//}
 
-	var user User
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("name = ?", userName).First(&user).Error; err != nil {
-		tx.Rollback() // 回滚事务
-		return err
-	}
-
-	// 更新操作
-	user.Votes++
-	if err := tx.Save(&user).Error; err != nil {
-		tx.Rollback() // 回滚事务
-		return err
-	}
-
-	// 提交事务
-	return tx.Commit().Error
-}
-
-// UpdateUserVotesMutex 6ms
+// UpdateUserVotesMutex 6ms，淘汰
 func UpdateUserVotesMutex(userName string) error {
 
-	var user User
-	result := DB.Where("name = ?", userName).First(&user)
+	var user model.User
+	result := db.GetDB().Where("name = ?", userName).First(&user)
 	if result.Error != nil {
 		return result.Error
 	}
 
 	// 尝试更新记录，同时增加版本号
-	result = DB.Model(&user).Where("version = ?", user.Version).Updates(User{
+	result = db.GetDB().Model(&user).Where("version = ?", user.Version).Updates(model.User{
 		Votes:   user.Votes + 1,
 		Version: user.Version + 1,
 	})
@@ -146,7 +113,7 @@ func UpdateUserVotesDirectSQL(userName string) error {
 	sql := `UPDATE users SET votes = votes + 1, version = version + 1 WHERE name = ? AND version = (SELECT version FROM (SELECT version FROM users WHERE name = ?) AS v)`
 
 	// 执行SQL语句
-	result := DB.Exec(sql, userName, userName)
+	result := db.GetDB().Exec(sql, userName, userName)
 
 	if result.Error != nil {
 		return result.Error // 如果执行SQL语句出错，返回错误
@@ -163,9 +130,9 @@ func UpdateUserVotesDirectSQL(userName string) error {
 // GetUserVotes 获取用户票数
 // 这个函数接受一个用户名作为参数，返回该用户的当前票数
 func GetUserVotes(userName string) (int, error) {
-	var user User
+	var user model.User
 	// 查找指定用户名的用户
-	tx := DB.Where("name = ?", userName).First(&user)
+	tx := db.GetDB().Where("name = ?", userName).First(&user)
 	if tx.Error != nil {
 		return 0, tx.Error // 如果操作出错，返回0和错误信息
 	}
@@ -173,18 +140,18 @@ func GetUserVotes(userName string) (int, error) {
 }
 
 // CreateOrUpdateTicket 添加创建票据记录的函数
-func CreateOrUpdateTicket(ticketID string) (*Ticket, error) {
-	var ticket Ticket
-	err := DB.Where("ticket_id = ?", ticketID).FirstOrCreate(&ticket, Ticket{TicketID: ticketID}).Error
+func CreateOrUpdateTicket(ticketID string) (*model.Ticket, error) {
+	var ticket model.Ticket
+	err := db.GetDB().Where("ticket_id = ?", ticketID).FirstOrCreate(&ticket, model.Ticket{TicketID: ticketID}).Error
 	if err != nil {
 		return nil, err
 	}
 
-	if ticket.Uses >= 1000000 {
+	if ticket.Uses >= config.MaxVotes {
 		return &ticket, fmt.Errorf("ticket %s has reached its maximum usage", ticketID)
 	}
 
 	ticket.Uses += 1
-	err = DB.Save(&ticket).Error
+	err = db.GetDB().Save(&ticket).Error
 	return &ticket, err
 }

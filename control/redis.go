@@ -1,29 +1,15 @@
-package db
+package control
 
 import (
+	"VoteMe/db"
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"log"
 	"math/rand"
 	"time"
 )
 
-var Rdb *redis.Client
 var ctx = context.Background()
-
-func InitRedis() {
-	Rdb = redis.NewClient(&redis.Options{
-		Addr:     "47.92.151.211:16379", // Redis地址
-		Password: "",                    // 密码
-		DB:       0,                     // 默认数据库
-	})
-
-	_, err := Rdb.Ping(ctx).Result()
-	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
-	}
-}
 
 func UpdateUserVotesWithLock(userName string) error {
 	lockKey := "lock:user:" + userName
@@ -38,7 +24,7 @@ func UpdateUserVotesWithLock(userName string) error {
 		}
 
 		// 尝试获取锁
-		locked, err := Rdb.SetNX(ctx, lockKey, lockVal, 20*time.Millisecond).Result()
+		locked, err := db.GetRedisCLi().SetNX(ctx, lockKey, lockVal, 10*time.Millisecond).Result()
 		if err != nil {
 			return fmt.Errorf("error while attempting to lock for user %s: %v", userName, err)
 		}
@@ -52,13 +38,13 @@ func UpdateUserVotesWithLock(userName string) error {
                 else
                     return 0
                 end`
-				_, err := Rdb.Eval(ctx, script, []string{lockKey}, lockVal).Result()
+				_, err := db.GetRedisCLi().Eval(ctx, script, []string{lockKey}, lockVal).Result()
 				if err != nil {
 					log.Printf("failed to release lock for user %s: %v\n", userName, err)
 				}
 			}()
 
-			return UpdateUserVotes(userName) // 调用原有逻辑更新票数
+			return UpdateUserVotesWithRetry(userName) // 调用原有逻辑更新票数
 		}
 
 		// 使用一个更大的随机间隔来减少锁竞争
