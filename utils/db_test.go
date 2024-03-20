@@ -2,9 +2,9 @@ package utils
 
 import (
 	"VoteMe/db"
+	"fmt"
 	"github.com/stretchr/testify/assert"
-	"log"
-	"net/http"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -23,10 +23,7 @@ func TestGenerateTicket(t *testing.T) {
 
 // 测试多机竞争问题
 func TestConcurrencyUpdateUserVotes(t *testing.T) {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
+	fmt.Println(runtime.GOMAXPROCS(0))
 	db.InitDB()    // 初始化数据库
 	db.InitRedis() // 初始化Redis
 
@@ -37,8 +34,6 @@ func TestConcurrencyUpdateUserVotes(t *testing.T) {
 	var wg sync.WaitGroup
 	votesToAdd := 1000
 	wg.Add(votesToAdd)
-	a, b := 0, 0
-	start := time.Now()
 	for i := 0; i < votesToAdd; i++ {
 		go func() {
 			defer wg.Done()
@@ -48,10 +43,41 @@ func TestConcurrencyUpdateUserVotes(t *testing.T) {
 	}
 
 	wg.Wait()
-	end := time.Since(start)
-	t.Logf("lock:%d, unlock:%d, time:%d\n", a, b, end)
 	finalVotes, err := db.GetUserVotes(userName)
 	assert.NoError(t, err)
 
 	assert.Equal(t, initialVotes+votesToAdd, finalVotes, "User votes should accurately reflect the number of votes added in a concurrent environment")
+}
+
+func TestUpdateUserVotesExecutionTime(t *testing.T) {
+	db.InitDB()                                                   // 假设DB是全局变量，这里初始化你的数据库连接
+	defer db.DB.Exec("DELETE FROM users where name = 'TestUser'") // 测试完成后清理数据
+
+	// 首先创建一个测试用户
+	user := db.User{Name: "TestUser", Votes: 0}
+	if err := db.DB.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	startTime := time.Now() // 开始时间
+	// 调用UpdateUserVotes函数
+	err := db.UpdateUserVotesDirectSQL("TestUser")
+	duration := time.Since(startTime) // 计算执行时间
+
+	// 打印执行时间
+	t.Logf("UpdateUserVotes executed in %v", duration)
+
+	if err != nil {
+		t.Errorf("UpdateUserVotes returned an error: %v", err)
+	}
+
+	// 验证投票数增加了1
+	var updatedUser db.User
+	if err := db.DB.Where("name = ?", "TestUser").First(&updatedUser).Error; err != nil {
+		t.Fatalf("Failed to query updated user: %v", err)
+	}
+
+	if updatedUser.Votes != user.Votes+1 {
+		t.Errorf("Expected votes to increase by 1, but got %d", updatedUser.Votes)
+	}
 }
