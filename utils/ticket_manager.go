@@ -2,6 +2,10 @@ package utils
 
 import (
 	"VoteMe/config"
+	"VoteMe/control"
+	"VoteMe/db"
+	"context"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -23,10 +27,18 @@ func init() {
 func ticketGenerator() {
 	currentTicket = generateRandomString(10)
 	ticker := time.NewTicker(config.TicketsUpdateTime)
+	err := control.CreateOrTicket(currentTicket)
+	if err != nil {
+		log.Fatalf("createTicket failed %s", err)
+	}
 	for range ticker.C { // 循环监听定时器的通道
 		ticketMutex.Lock()                       // 在修改currentTicket之前加锁
 		currentTicket = generateRandomString(10) // 生成一个长度为10的随机字符串作为新票据
-		ticketMutex.Unlock()                     // 修改完成后解锁
+		err = control.CreateOrTicket(currentTicket)
+		if err != nil {
+			log.Fatalf("createTicket failed %s", err)
+		}
+		ticketMutex.Unlock() // 修改完成后解锁
 	}
 }
 
@@ -49,4 +61,11 @@ func GetCurrentTicket() string {
 	//ticketMutex.Lock()         // 在读取currentTicket之前加锁
 	//defer ticketMutex.Unlock() // 确保在函数返回前解锁
 	return currentTicket // 返回当前有效的票据
+}
+
+// 在Redis中设置票据的使用上限
+func setTicketUsageLimitInRedis(ticketID string, limit int) error {
+	// 假设使用Redis客户端rdb和上下文ctx
+	_, err := db.GetRedisCLi().Set(context.Background(), ticketID, limit, config.TicketsUpdateTime).Result()
+	return err
 }

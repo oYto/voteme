@@ -142,19 +142,45 @@ func GetUserVotes(userName string) (int, error) {
 	return votes, nil // 返回查询到的票数
 }
 
-// CreateOrUpdateTicket 添加创建票据记录的函数
-func CreateOrUpdateTicket(ticketID string) (*model.Ticket, error) {
+// UpdateTicket 添加创建票据记录的函数
+func UpdateTicket(ticketID string) (*model.Ticket, error) {
+	var ticket model.Ticket
+
+	// 执行条件更新
+	result := db.GetDB().Exec("UPDATE tickets SET uses = uses + 1 WHERE ticket_id = ? AND uses < ?", ticketID, config.MaxVotes)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	// 检查是否有行被更新
+	if result.RowsAffected == 0 {
+		// 如果没有行被更新，说明票据使用次数已达到上限
+		return nil, fmt.Errorf("ticket %s has reached its maximum usage", ticketID)
+	}
+
+	return &ticket, nil
+}
+
+//func UpdateTicket(ticketID string) (*model.Ticket, error) {
+//	var ticket model.Ticket
+//	err := db.GetDB().Raw("SELECT uses FROM tickets WHERE ticket_id = ?", ticketID).Scan(&ticket).Error
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	if ticket.Uses >= config.MaxVotes {
+//		return &ticket, fmt.Errorf("ticket %s has reached its maximum usage", ticketID)
+//	}
+//
+//	err = db.GetDB().Exec("UPDATE tickets SET uses = uses + 1 WHERE ticket_id = ?", ticketID).Error
+//	return &ticket, err
+//}
+
+func CreateOrTicket(ticketID string) error {
 	var ticket model.Ticket
 	err := db.GetDB().Where("ticket_id = ?", ticketID).FirstOrCreate(&ticket, model.Ticket{TicketID: ticketID}).Error
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	if ticket.Uses >= config.MaxVotes {
-		return &ticket, fmt.Errorf("ticket %s has reached its maximum usage", ticketID)
-	}
-
-	ticket.Uses += 1
-	err = db.GetDB().Save(&ticket).Error
-	return &ticket, err
+	return nil
 }

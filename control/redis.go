@@ -11,8 +11,9 @@ import (
 
 var ctx = context.Background()
 
+// UpdateUserVotesWithLock redis 分布式锁进行投票
 func UpdateUserVotesWithLock(userName string) error {
-	lockKey := "lock:user:" + userName
+	lockKey := userName
 	lockVal := "1" // 用于标识锁的持有者，可以是一个更复杂的标识，如UUID
 
 	startTime := time.Now()
@@ -44,11 +45,29 @@ func UpdateUserVotesWithLock(userName string) error {
 				}
 			}()
 
-			return UpdateUserVotesWithRetry(userName) // 调用原有逻辑更新票数
+			return UpdateUserVotes(userName) // 调用原有逻辑更新票数
 		}
 
 		// 使用一个更大的随机间隔来减少锁竞争
 		time.Sleep(time.Duration(rand.Intn(100)+10) * time.Millisecond) // 随机等待时间在100到600毫秒之间
 
 	}
+}
+
+// ValidateAndUpdateTicket 使用Redis的DECR命令减少票据的使用次数，并验证票据是否有效
+func ValidateAndUpdateTicket(ticketID string) (bool, error) {
+
+	// 使用DECR命令减少票据的可用次数
+	result, err := db.GetRedisCLi().Decr(context.Background(), ticketID).Result()
+	if err != nil {
+		return false, err // 处理可能的Redis错误
+	}
+
+	if result < 0 {
+		// 票据使用次数已超上限
+		return false, fmt.Errorf("ticket %s has reached its maximum usage", ticketID)
+	}
+
+	// 票据有效
+	return true, nil
 }

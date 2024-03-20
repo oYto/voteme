@@ -93,20 +93,17 @@ var mutationType = graphql.NewObject(
 					},
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) { // 解析函数
-					//ticket, _ := params.Args["ticket"].(string)
 					names, _ := params.Args["name"].([]interface{})
-					//
-					//// 检查票据是否合法
-					//if ticket != utils.GetCurrentTicket() {
-					//	return false, fmt.Errorf("invalid or expired ticket")
-					//}
-
 					ticketID, _ := params.Args["ticket"].(string)
-					_, err := control.CreateOrUpdateTicket(ticketID)
+					// 检查票据是否还有效
+					if ticketID != utils.GetCurrentTicket() {
+						return false, fmt.Errorf("invalid or expired ticket")
+					}
+					// 检验使用次数是否超过 todo 这里不是很准确
+					_, err := control.UpdateTicket(ticketID)
 					if err != nil {
 						return false, err
 					}
-
 					// 对每个用户名执行投票操作
 					for _, nameInterface := range names {
 						name, ok := nameInterface.(string)
@@ -138,3 +135,30 @@ func NewGraphQLSchema() (graphql.Schema, error) {
 	)
 	return Schema, err
 }
+
+//func voteMutationResolver(params graphql.ResolveParams) (interface{}, error) {
+//	ticketID, _ := params.Args["ticket"].(string)
+//	names, _ := params.Args["name"].([]interface{})
+//
+//	// 验证票据有效性
+//	isValid, err := control.ValidateAndUpdateTicket(ticketID)
+//	if err != nil || !isValid {
+//		// 票据无效或发生错误
+//		return false, err
+//	}
+//
+//	// 票据有效，处理投票逻辑...
+//	for _, nameInterface := range names {
+//		name, ok := nameInterface.(string)
+//		if !ok {
+//			return false, fmt.Errorf("invalid name type")
+//		}
+//		// 执行具体的投票操作，这里简化处理
+//		err := control.UpdateUserVotesWithLock(name)
+//		if err != nil {
+//			return false, err
+//		}
+//	}
+//
+//	return true, nil // 投票成功
+//}
