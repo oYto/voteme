@@ -8,14 +8,16 @@ db:
   user: "root"        # user
   password: "123456"  # password
   dbname: "voteme"    # dbname
-
+  max_idle_conn: 20    # 最大空闲连接数
+  max_open_conn: 100   # 最大连接数
+  max_idle_time: 900  # 最大空闲时间
 
 redis:
   rhost: "47.92.151.211"
   rport: 16379
   rdb: 0
   passwd: ''
-  poolsize: 1000
+  poolsize: 100
 
 maxVotes: 10000 # 一个票据最大投票次数
 ticketUpdateTime: 200s # 一个票据的失效时间

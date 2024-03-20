@@ -114,7 +114,7 @@ var mutationType = graphql.NewObject(
 						}
 						// 1：使用redis分布式锁，UpdateUserVotesWithLock
 						// 2：使用乐观锁，UpdateUserVotesWithRetry
-						err := control.UpdateUserVotesWithRetry(name) // 调用数据库操作增加票数
+						err := control.UpdateUserVotesWithLock(name) // 调用数据库操作增加票数
 						if err != nil {
 							return false, err
 						}

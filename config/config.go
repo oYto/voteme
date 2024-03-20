@@ -84,7 +84,7 @@ func readConf() {
 
 }
 
-func InitConf() {
+func init() {
 	globalConf := GetGlobalConf() // 获取全局配置文件
 	fmt.Println(globalConf)
 }

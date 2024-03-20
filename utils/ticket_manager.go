@@ -13,7 +13,7 @@ var (
 )
 
 // Init 初始化票据生成器
-func Init() {
+func init() {
 	rand.Seed(time.Now().UnixNano())
 	go ticketGenerator()
 }

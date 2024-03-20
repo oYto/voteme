@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"VoteMe/config"
 	"VoteMe/control"
 	"VoteMe/db"
 	"VoteMe/model"
@@ -70,4 +71,33 @@ func TestUpdateUserVotesExecutionTime(t *testing.T) {
 	if updatedUser.Votes != user.Votes+1 {
 		t.Errorf("Expected votes to increase by 1, but got %d", updatedUser.Votes)
 	}
+}
+
+func TestGetUserVotesPerformance(t *testing.T) {
+	db.GetDB() // 初始化数据库
+	fmt.Println(config.GetGlobalConf().DbConfig.MaxOpenConn)
+	// 假设 "Alice" 是数据库中一个有效的用户名
+	userName := "Alice"
+
+	// 要测试的请求次数
+	requests := 1000
+
+	// 开始计时
+	startTime := time.Now()
+
+	votesToAdd := 1000
+	var wg sync.WaitGroup
+	wg.Add(votesToAdd)
+	for i := 0; i < votesToAdd; i++ {
+		go func() {
+			defer wg.Done()
+			_, err := control.GetUserVotes(userName)
+			assert.NoError(t, err)
+		}()
+	}
+
+	// 计算总耗时
+	duration := time.Since(startTime)
+
+	t.Logf("Processed %d requests in %v", requests, duration)
 }

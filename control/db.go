@@ -130,13 +130,16 @@ func UpdateUserVotesDirectSQL(userName string) error {
 // GetUserVotes 获取用户票数
 // 这个函数接受一个用户名作为参数，返回该用户的当前票数
 func GetUserVotes(userName string) (int, error) {
-	var user model.User
-	// 查找指定用户名的用户
-	tx := db.GetDB().Where("name = ?", userName).First(&user)
-	if tx.Error != nil {
-		return 0, tx.Error // 如果操作出错，返回0和错误信息
+	var votes int
+	// 直接使用SQL查询语句
+	result := db.GetDB().Raw("SELECT votes FROM users WHERE name = ? LIMIT 1", userName).Scan(&votes)
+	if result.Error != nil {
+		return 0, result.Error // 如果执行SQL语句出错，返回错误
 	}
-	return user.Votes, nil // 操作成功，返回用户的票数和nil作为错误
+	if result.RowsAffected == 0 {
+		return 0, fmt.Errorf("no user found with name: %s", userName) // 如果没有找到该用户
+	}
+	return votes, nil // 返回查询到的票数
 }
 
 // CreateOrUpdateTicket 添加创建票据记录的函数
