@@ -3,7 +3,6 @@ package graphql
 import (
 	"VoteMe/control"
 	"VoteMe/utils" // 导入utils包用于获取当前票据
-	"encoding/json"
 	"fmt"
 	"github.com/graphql-go/graphql" // 导入graphql包用于创建GraphQL服务
 )
@@ -78,7 +77,7 @@ var queryType = graphql.NewObject(
 
 // 定义GraphQL变更类型 加锁实现
 // 这里定义了一个变更操作：vote
-/*
+
 var mutationType = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Mutation",
@@ -135,67 +134,6 @@ func NewGraphQLSchema() (graphql.Schema, error) {
 		graphql.SchemaConfig{
 			Query:    queryType,
 			Mutation: mutationType,
-		},
-	)
-	return Schema, err
-}
-*/
-
-// 投票变更操作的解析器
-var voteField = &graphql.Field{
-	Type: graphql.Boolean,
-	Args: graphql.FieldConfigArgument{
-		"name": &graphql.ArgumentConfig{
-			Type: graphql.NewList(graphql.String),
-		},
-		"ticket": &graphql.ArgumentConfig{
-			Type: graphql.String,
-		},
-	},
-	Resolve: voteMutationResolver, // 指向我们将要实现的解析器函数
-}
-
-// 实现voteMutationResolver函数
-func voteMutationResolver(params graphql.ResolveParams) (interface{}, error) {
-	names, _ := params.Args["name"].([]interface{})
-	ticketID, _ := params.Args["ticket"].(string)
-
-	// 构造要发送到Kafka的消息
-	message := map[string]interface{}{
-		"names":  names,
-		"ticket": ticketID,
-	}
-
-	// 序列化消息为JSON
-	messageBytes, err := json.Marshal(message)
-	if err != nil {
-		return false, err
-	}
-
-	// Kafka 生产者初始化
-	producer := utils.NewKafkaProducer("localhost:9092")
-	defer producer.Close()
-
-	// 发送消息到Kafka的"votes-requests"主题
-	err = utils.SendVoteRequest(producer, "votes-requests", messageBytes)
-	if err != nil {
-		return false, err
-	}
-
-	// 假设投票总是成功（因为实际的投票逻辑现在是异步处理的）
-	return true, nil
-}
-
-func NewGraphQLSchema() (graphql.Schema, error) {
-	Schema, err := graphql.NewSchema(
-		graphql.SchemaConfig{
-			Query: queryType,
-			Mutation: graphql.NewObject(graphql.ObjectConfig{
-				Name: "Mutation",
-				Fields: graphql.Fields{
-					"vote": voteField, // 使用新定义的voteField
-				},
-			}),
 		},
 	)
 	return Schema, err
