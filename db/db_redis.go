@@ -14,9 +14,9 @@ var ctx = context.Background()
 
 func InitRedis() {
 	Rdb = redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:16379", // Redis地址
-		Password: "",               // 密码
-		DB:       0,                // 默认数据库
+		Addr:     "47.92.151.211:16379", // Redis地址
+		Password: "",                    // 密码
+		DB:       0,                     // 默认数据库
 	})
 
 	_, err := Rdb.Ping(ctx).Result()
@@ -30,7 +30,7 @@ func UpdateUserVotesWithLock(userName string) error {
 	lockVal := "1" // 用于标识锁的持有者，可以是一个更复杂的标识，如UUID
 
 	startTime := time.Now()
-	maxTime := 4000 * time.Second
+	maxTime := 10 * time.Second
 	// 循环直到获取锁或超过最大等待时间
 	for {
 		if time.Since(startTime) > maxTime {
@@ -38,7 +38,7 @@ func UpdateUserVotesWithLock(userName string) error {
 		}
 
 		// 尝试获取锁
-		locked, err := Rdb.SetNX(ctx, lockKey, lockVal, 100*time.Millisecond).Result()
+		locked, err := Rdb.SetNX(ctx, lockKey, lockVal, 20*time.Millisecond).Result()
 		if err != nil {
 			return fmt.Errorf("error while attempting to lock for user %s: %v", userName, err)
 		}
@@ -62,7 +62,7 @@ func UpdateUserVotesWithLock(userName string) error {
 		}
 
 		// 使用一个更大的随机间隔来减少锁竞争
-		time.Sleep(time.Duration(rand.Intn(10)+50) * time.Millisecond) // 随机等待时间在100到600毫秒之间
+		time.Sleep(time.Duration(rand.Intn(100)+10) * time.Millisecond) // 随机等待时间在100到600毫秒之间
 
 	}
 }
