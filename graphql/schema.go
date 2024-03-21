@@ -99,7 +99,7 @@ var mutationType = graphql.NewObject(
 					if ticketID != utils.GetCurrentTicket() {
 						return false, fmt.Errorf("invalid or expired ticket")
 					}
-					// 检验使用次数是否超过 todo 这里不是很准确
+					// 检验使用次数是否超过
 					_, err := control.UpdateTicket(ticketID)
 					if err != nil {
 						return false, err

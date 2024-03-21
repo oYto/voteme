@@ -142,12 +142,13 @@ func GetUserVotes(userName string) (int, error) {
 	return votes, nil // 返回查询到的票数
 }
 
-// UpdateTicket 添加创建票据记录的函数
+// UpdateTicket 判断是否超时以及次数是否达到上限
 func UpdateTicket(ticketID string) (*model.Ticket, error) {
 	var ticket model.Ticket
 
 	// 执行条件更新
-	result := db.GetDB().Exec("UPDATE tickets SET uses = uses + 1 WHERE ticket_id = ? AND uses < ?", ticketID, config.MaxVotes)
+	result := db.GetDB().Exec("UPDATE tickets SET uses = uses + 1 WHERE ticket_id = ? AND uses < ?",
+		ticketID, config.MaxVotes)
 	if result.Error != nil {
 		return nil, result.Error
 	}

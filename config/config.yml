@@ -19,5 +19,5 @@ redis:
   passwd: ''
   poolsize: 100
 
-maxVotes: 1000 # 一个票据最大投票次数
-ticketUpdateTime: 20s # 一个票据的失效时间
+maxVotes: 10000 # 一个票据最大投票次数
+ticketUpdateTime: 200s # 一个票据的失效时间
