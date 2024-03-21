@@ -86,9 +86,14 @@ func readConf() {
 			fmt.Println(fmt.Sprintf("%s --- %s", time.Now(), "更新配置项"))
 			MaxVotes = viper.GetInt("maxVotes")
 			TicketsUpdateTime = viper.GetDuration("ticketUpdateTime")
+			TicketCacheRefreshTime = viper.GetDuration("ticketCacheRefreshTime")
+			VotesCacheToDbTime = viper.GetDuration("votesCacheToDbTime")
+			TicketLen = viper.GetInt("ticketLen")
+			fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，redis投票数据多久刷盘一次：%f，票据长度：%d \n",
+				MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(), VotesCacheToDbTime.Seconds(), TicketLen)
+
 		})
 	})
-
 }
 
 func init() {

@@ -1,16 +1,25 @@
 package main
 
 import (
+	"VoteMe/config"
 	"VoteMe/graphql" // 导入自定义的graphql包，其中定义了GraphQL的schema，注意替换为实际的导入路径
-	"log"            // 导入log包，用于记录日志
-	"net/http"       // 导入net/http包，用于HTTP服务器的功能
+	"fmt"
+	"log"      // 导入log包，用于记录日志
+	"net/http" // 导入net/http包，用于HTTP服务器的功能
 	"runtime"
+	"time"
 
 	"github.com/graphql-go/handler" // 导入graphql-go/handler包，用于处理GraphQL请求
 	_ "net/http/pprof"
 )
 
 func main() {
+	go func() {
+		for {
+			fmt.Println("...................最大票据数：", config.TicketLen)
+			time.Sleep(time.Second)
+		}
+	}()
 	// 初始化全局配置
 	// 定义GraphQL服务可用的查询和变更操作
 	schema, err := graphql.NewGraphQLSchema()
