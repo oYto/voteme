@@ -27,17 +27,33 @@ func init() {
 func ticketGenerator() {
 	currentTicket = generateRandomString(10)
 	ticker := time.NewTicker(config.TicketsUpdateTime)
+
+	//// 将当前有效票据写入 redis
+	//err := control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
+	//if err != nil {
+	//	log.Fatalf("createTicket to redis failed %s", err)
+	//}
+	// 将当前有效的票据写入 mysql
 	err := control.CreateOrTicket(currentTicket)
 	if err != nil {
-		log.Fatalf("createTicket failed %s", err)
+		log.Fatalf("createTicket to mysql failed %s", err)
 	}
+
 	for range ticker.C { // 循环监听定时器的通道
-		ticketMutex.Lock()                       // 在修改currentTicket之前加锁
+		ticketMutex.Lock()                       // 在修改 currentTicket 之前加锁
 		currentTicket = generateRandomString(10) // 生成一个长度为10的随机字符串作为新票据
+
+		//// 将当前有效票据写入 redis
+		//err = control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
+		//if err != nil {
+		//	log.Fatalf("createTicket to redis failed %s", err)
+		//}
+		// 将当前有效的票据写入 mysql
 		err = control.CreateOrTicket(currentTicket)
 		if err != nil {
-			log.Fatalf("createTicket failed %s", err)
+			log.Fatalf("createTicket to mysql failed %s", err)
 		}
+
 		ticketMutex.Unlock() // 修改完成后解锁
 	}
 }
@@ -56,10 +72,7 @@ func generateRandomString(n int) string {
 }
 
 // GetCurrentTicket GetCurrentTicket函数返回当前有效的票据
-// 该函数使用互斥锁来确保并发访问时的安全性
 func GetCurrentTicket() string {
-	//ticketMutex.Lock()         // 在读取currentTicket之前加锁
-	//defer ticketMutex.Unlock() // 确保在函数返回前解锁
 	return currentTicket // 返回当前有效的票据
 }
 

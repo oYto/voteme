@@ -1,11 +1,14 @@
 package control
 
 import (
+	"VoteMe/config"
 	"VoteMe/db"
 	"context"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"log"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -54,8 +57,19 @@ func UpdateUserVotesWithLock(userName string) error {
 	}
 }
 
-// ValidateAndUpdateTicket 使用Redis的DECR命令减少票据的使用次数，并验证票据是否有效
-func ValidateAndUpdateTicket(ticketID string) (bool, error) {
+// SetValidateTicket 将有效票据缓存起来，设置过期时间以及使用次数
+func SetValidateTicket(ticketID string, maxVotes int, ticketUpdateTime time.Duration) error {
+	maxVotesStr := fmt.Sprint(maxVotes)
+
+	err := db.GetRedisCLi().Set(context.Background(), ticketID, maxVotesStr, ticketUpdateTime).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DecreaseUsageLimit 减少键的使用次数，并检查是否达到上限或过期
+func DecreaseUsageLimit(ticketID string) (bool, error) {
 
 	// 使用DECR命令减少票据的可用次数
 	result, err := db.GetRedisCLi().Decr(context.Background(), ticketID).Result()
@@ -70,4 +84,30 @@ func ValidateAndUpdateTicket(ticketID string) (bool, error) {
 
 	// 票据有效
 	return true, nil
+}
+
+// GetVotesByName 获取某个选手的票数：这里是缓存，会有一定时延,导致数据不准确
+func GetVotesByName(name string) (int, error) {
+	votesStr, err := db.GetRedisCLi().Get(context.Background(), name).Result()
+	if err == redis.Nil {
+		votes, err := GetUserVotes(name)
+		//fmt.Println("hit mysql")
+		if err != nil {
+			return 0, err
+		}
+		err = db.GetRedisCLi().Set(context.Background(), name, votes, config.TicketCacheRefreshTime).Err()
+		if err != nil {
+			return 0, err
+		}
+		return votes, nil
+	} else if err != nil {
+		return 0, err
+	}
+
+	votesInt, err := strconv.Atoi(votesStr)
+	if err != nil {
+		return 0, err
+	}
+	//fmt.Println("hit redis")
+	return votesInt, nil
 }

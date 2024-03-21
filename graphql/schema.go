@@ -54,7 +54,7 @@ var queryType = graphql.NewObject(
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) { // 解析函数
 					name, _ := params.Args["name"].(string)
-					votes, err := control.GetUserVotes(name) // 调用数据库操作获取票数
+					votes, err := control.GetVotesByName(name) // 先去缓存查，没有再查数据库
 					if err != nil {
 						return nil, fmt.Errorf("error getting votes for user %s: %s", name, err)
 					}
