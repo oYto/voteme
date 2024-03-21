@@ -60,8 +60,8 @@ func UpdateUserVotesWithLock(userName string) error {
 // SetValidateTicket 将有效票据缓存起来，设置过期时间以及使用次数
 func SetValidateTicket(ticketID string, maxVotes int, ticketUpdateTime time.Duration) error {
 	//maxVotesStr := fmt.Sprint(maxVotes)
-
-	err := db.GetRedisCLi().Set(context.Background(), ticketID, maxVotes, ticketUpdateTime).Err()
+	ticketIDCache := fmt.Sprintf("ticketIDCache:%s", ticketID)
+	err := db.GetRedisCLi().Set(context.Background(), ticketIDCache, maxVotes, ticketUpdateTime).Err()
 	if err != nil {
 		return err
 	}
@@ -70,9 +70,10 @@ func SetValidateTicket(ticketID string, maxVotes int, ticketUpdateTime time.Dura
 
 // DecreaseUsageLimit 减少键的使用次数，并检查是否达到上限或过期
 func DecreaseUsageLimit(ticketID string) error {
+	ticketIDCache := fmt.Sprintf("ticketIDCache:%s", ticketID)
 
 	// 使用DECR命令减少票据的可用次数
-	result, err := db.GetRedisCLi().Decr(context.Background(), ticketID).Result()
+	result, err := db.GetRedisCLi().Decr(context.Background(), ticketIDCache).Result()
 	if err != nil {
 		return err // 处理可能的Redis错误
 	}
@@ -131,6 +132,17 @@ func GetVotesByName(name string) (int, error) {
 	}
 	//fmt.Println("hit redis")
 	return votesInt, nil
+}
+
+func VoteForUserRedis(userName string) error {
+	// 投票计数器的键
+	key := fmt.Sprintf("votes:%s", userName)
+	// 增加用户的票数
+	_, err := db.GetRedisCLi().Incr(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetTicketUsageLimitInRedis 在Redis中设置票据的使用上限和过期时间

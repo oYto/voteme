@@ -17,8 +17,9 @@ redis:
   rport: 16379
   rdb: 0
   passwd: ''
-  poolsize: 100
+  poolsize: 1000
 
 maxVotes: 100000 # 一个票据最大投票次数
 ticketUpdateTime: 2000s # 一个票据的失效时间
-ticketCacheRefreshTime: 20s # 票数缓存刷新时间
+ticketCacheRefreshTime: 2s # 票数缓存刷新时间
+tickerCacheUsersVoteTime: 2s # redis 中的投票数据，多久刷盘一次

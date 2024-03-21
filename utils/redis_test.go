@@ -3,6 +3,7 @@ package utils
 import (
 	"VoteMe/control"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
@@ -39,3 +40,29 @@ func TestGetVotesByName(t *testing.T) {
 		assert.Equal(t, 106803, votes)
 	}
 }
+
+func TestVoteForUser(t *testing.T) {
+	name := "Alice"
+	n := 100
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			control.VoteForUserRedis(name)
+		}()
+	}
+	wg.Wait()
+}
+
+//func TestGetAllUserNames(t *testing.T) {
+//	names, err := GetAllUserNames()
+//	assert.Nil(t, err)
+//	assert.Equal(t, []string{"Alice", "Bob"}, names)
+//}
+//
+//func TestGetDbVotesToRedis(t *testing.T) {
+//	err := GetDbVotesToRedis()
+//	assert.Nil(t, err)
+//
+//}
