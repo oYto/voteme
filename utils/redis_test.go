@@ -36,7 +36,9 @@ func TestTicketUsage(t *testing.T) {
 // 测试将获得票的数据插入redis是否正常，并且在过期后能否从数据库重新获取，并加载
 func TestGetVotesByName(t *testing.T) {
 	name := "Alice"
-	votes, err := control.GetVotesByName(name)
-	assert.Nil(t, err)
-	assert.Equal(t, 63123, votes)
+	for i := 0; i < 1000; i++ {
+		votes, err := control.GetVotesByName(name)
+		assert.Nil(t, err)
+		assert.Equal(t, 70962, votes)
+	}
 }

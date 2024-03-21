@@ -89,18 +89,39 @@ func DecreaseUsageLimit(ticketID string) (bool, error) {
 // GetVotesByName 获取某个选手的票数：这里是缓存，会有一定时延,导致数据不准确
 func GetVotesByName(name string) (int, error) {
 	votesStr, err := db.GetRedisCLi().Get(context.Background(), name).Result()
+
 	if err == redis.Nil {
-		votes, err := GetUserVotes(name)
-		//fmt.Println("hit mysql")
+		lockKey := "lock:" + name // 使用不同的键作为锁
+		lockValue := "1"
+
+		// 尝试获取锁
+		ok, err := db.GetRedisCLi().SetNX(context.Background(), lockKey, lockValue, 20*time.Millisecond).Result()
 		if err != nil {
 			return 0, err
 		}
-		err = db.GetRedisCLi().Set(context.Background(), name, votes, config.TicketCacheRefreshTime).Err()
-		if err != nil {
-			return 0, err
+
+		if ok {
+			defer db.GetRedisCLi().Del(context.Background(), lockKey) // 确保释放锁
+			votes, err := GetUserVotes(name)
+			if err != nil {
+				return 0, err
+			}
+			//fmt.Println("hit mysql---------")
+			db.GetRedisCLi().Set(context.Background(), name, votes, config.TicketCacheRefreshTime)
+			return votes, nil
 		}
-		return votes, nil
-	} else if err != nil {
+
+		// 如果没有获取到锁，则等待一段时间后重试
+		for i := 0; i < 3; i++ { // 重试次数
+			time.Sleep(10 * time.Millisecond)                                         // 等待时间
+			votesStr, err = db.GetRedisCLi().Get(context.Background(), name).Result() // 尝试再次从缓存获取
+			if err == nil {
+				break
+			}
+		}
+	}
+
+	if err != nil && err != redis.Nil {
 		return 0, err
 	}
 
@@ -111,3 +132,29 @@ func GetVotesByName(name string) (int, error) {
 	//fmt.Println("hit redis")
 	return votesInt, nil
 }
+
+// GetVotesByName 可能存在缓存穿透
+//func GetVotesByName(name string) (int, error) {
+//	votesStr, err := db.GetRedisCLi().Get(context.Background(), name).Result()
+//	if err == redis.Nil {
+//		votes, err := GetUserVotes(name)
+//		//fmt.Println("hit mysql")
+//		if err != nil {
+//			return 0, err
+//		}
+//		err = db.GetRedisCLi().Set(context.Background(), name, votes, config.TicketCacheRefreshTime).Err()
+//		if err != nil {
+//			return 0, err
+//		}
+//		return votes, nil
+//	} else if err != nil {
+//		return 0, err
+//	}
+//
+//	votesInt, err := strconv.Atoi(votesStr)
+//	if err != nil {
+//		return 0, err
+//	}
+//	//fmt.Println("hit redis")
+//	return votesInt, nil
+//}
