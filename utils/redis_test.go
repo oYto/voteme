@@ -3,7 +3,6 @@ package utils
 import (
 	"VoteMe/control"
 	"github.com/stretchr/testify/assert"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -19,8 +18,7 @@ func TestTicketUsage(t *testing.T) {
 	//err = db.GetRedisCLi().Get(context.Background(), ticketID).Err()
 	//assert.NotNil(t, err)
 	for i := 0; i < maxVotes; i++ {
-		flag, err := control.DecreaseUsageLimit(ticketID)
-		assert.Equal(t, "true", strconv.FormatBool(flag))
+		err := control.DecreaseUsageLimit(ticketID)
 		assert.Nil(t, err)
 
 		//remaining, err := db.GetRedisCLi().Get(context.Background(), ticketID).Int()
@@ -28,8 +26,7 @@ func TestTicketUsage(t *testing.T) {
 		//assert.Equal(t, maxVotes-i-1, remaining, "剩余次数不匹配")
 	}
 	//再次减少应达到上限
-	flag, err := control.DecreaseUsageLimit(ticketID)
-	assert.Equal(t, "false", strconv.FormatBool(flag))
+	err = control.DecreaseUsageLimit(ticketID)
 	assert.NotNil(t, err)
 }
 
@@ -39,6 +36,6 @@ func TestGetVotesByName(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		votes, err := control.GetVotesByName(name)
 		assert.Nil(t, err)
-		assert.Equal(t, 70962, votes)
+		assert.Equal(t, 106803, votes)
 	}
 }

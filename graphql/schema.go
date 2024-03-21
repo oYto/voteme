@@ -54,7 +54,7 @@ var queryType = graphql.NewObject(
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) { // 解析函数
 					name, _ := params.Args["name"].(string)
-					votes, err := control.GetVotesByName(name) // 先去缓存查，没有再查数据库
+					votes, err := control.GetVotesByName(name) // 先去缓存查，没有再查数据库 600qps
 					if err != nil {
 						return nil, fmt.Errorf("error getting votes for user %s: %s", name, err)
 					}
@@ -64,7 +64,7 @@ var queryType = graphql.NewObject(
 			"getCurrentTicket": &graphql.Field{ // 获取当前票据查询
 				Type: ticketType,
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					currentTicket := utils.GetCurrentTicket() // 获取当前票据
+					currentTicket := utils.GetCurrentTicket() // 获取当前票据 800qps
 					return map[string]interface{}{
 						"ticketID": currentTicket,
 						"validity": true,
@@ -95,15 +95,19 @@ var mutationType = graphql.NewObject(
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) { // 解析函数
 					names, _ := params.Args["name"].([]interface{})
 					ticketID, _ := params.Args["ticket"].(string)
-					// 检查票据是否还有效
-					if ticketID != utils.GetCurrentTicket() {
+					err := control.DecreaseUsageLimit(ticketID)
+					if err != nil {
 						return false, fmt.Errorf("invalid or expired ticket")
 					}
-					// 检验使用次数是否超过
-					_, err := control.UpdateTicket(ticketID)
-					if err != nil {
-						return false, err
-					}
+					//// 检查票据是否还有效
+					//if ticketID != utils.GetCurrentTicket() {
+					//	return false, fmt.Errorf("invalid or expired ticket")
+					//}
+					//// 检验使用次数是否超过
+					//_, err := control.UpdateTicket(ticketID)
+					//if err != nil {
+					//	return false, err
+					//}
 					// 对每个用户名执行投票操作
 					for _, nameInterface := range names {
 						name, ok := nameInterface.(string)
@@ -112,7 +116,7 @@ var mutationType = graphql.NewObject(
 						}
 						// 1：使用redis分布式锁，UpdateUserVotesWithLock
 						// 2：使用乐观锁，UpdateUserVotesWithRetry
-						err := control.UpdateUserVotesWithLock(name) // 调用数据库操作增加票数
+						err := control.UpdateUserVotesWithRetry(name) // 调用数据库操作增加票数
 						if err != nil {
 							return false, err
 						}

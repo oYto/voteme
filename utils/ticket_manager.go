@@ -3,8 +3,6 @@ package utils
 import (
 	"VoteMe/config"
 	"VoteMe/control"
-	"VoteMe/db"
-	"context"
 	"log"
 	"math/rand"
 	"sync"
@@ -28,13 +26,13 @@ func ticketGenerator() {
 	currentTicket = generateRandomString(10)
 	ticker := time.NewTicker(config.TicketsUpdateTime)
 
-	//// 将当前有效票据写入 redis
-	//err := control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
-	//if err != nil {
-	//	log.Fatalf("createTicket to redis failed %s", err)
-	//}
+	// 将当前有效票据写入 redis
+	err := control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
+	if err != nil {
+		log.Fatalf("createTicket to redis failed %s", err)
+	}
 	// 将当前有效的票据写入 mysql
-	err := control.CreateOrTicket(currentTicket)
+	err = control.CreateOrTicket(currentTicket)
 	if err != nil {
 		log.Fatalf("createTicket to mysql failed %s", err)
 	}
@@ -43,11 +41,11 @@ func ticketGenerator() {
 		ticketMutex.Lock()                       // 在修改 currentTicket 之前加锁
 		currentTicket = generateRandomString(10) // 生成一个长度为10的随机字符串作为新票据
 
-		//// 将当前有效票据写入 redis
-		//err = control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
-		//if err != nil {
-		//	log.Fatalf("createTicket to redis failed %s", err)
-		//}
+		// 将当前有效票据写入 redis
+		err = control.SetValidateTicket(currentTicket, config.MaxVotes, config.TicketsUpdateTime)
+		if err != nil {
+			log.Fatalf("createTicket to redis failed %s", err)
+		}
 		// 将当前有效的票据写入 mysql
 		err = control.CreateOrTicket(currentTicket)
 		if err != nil {
@@ -74,11 +72,4 @@ func generateRandomString(n int) string {
 // GetCurrentTicket GetCurrentTicket函数返回当前有效的票据
 func GetCurrentTicket() string {
 	return currentTicket // 返回当前有效的票据
-}
-
-// 在Redis中设置票据的使用上限
-func setTicketUsageLimitInRedis(ticketID string, limit int) error {
-	// 假设使用Redis客户端rdb和上下文ctx
-	_, err := db.GetRedisCLi().Set(context.Background(), ticketID, limit, config.TicketsUpdateTime).Result()
-	return err
 }
