@@ -24,16 +24,16 @@ func TestConcurrencyUpdateUserVotes(t *testing.T) {
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
-	votesToAdd := 1000
+	votesToAdd := 10000
 	wg.Add(votesToAdd)
 	for i := 0; i < votesToAdd; i++ {
 		go func() {
 			defer wg.Done()
-			err := control.UpdateUserVotesWithRetry(userName)
+			err := control.VoteForUserRedis(userName)
 			assert.NoError(t, err)
 		}()
 	}
-
+	time.Sleep(config.VotesCacheToDbTime)
 	wg.Wait()
 	finalVotes, err := control.GetUserVotes(userName)
 	assert.NoError(t, err)
@@ -100,4 +100,9 @@ func TestGetUserVotesPerformance(t *testing.T) {
 	duration := time.Since(startTime)
 
 	t.Logf("Processed %d requests in %v", requests, duration)
+}
+
+func TestGetCurrentTicket(t *testing.T) {
+	ticketId := GetCurrentTicket()
+	t.Log(ticketId)
 }

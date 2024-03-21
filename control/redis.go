@@ -16,7 +16,7 @@ var ctx = context.Background()
 
 // UpdateUserVotesWithLock redis 分布式锁进行投票
 func UpdateUserVotesWithLock(userName string) error {
-	lockKey := "update:user:vote:lock:" + userName
+	lockKey := "Voteme:update:user:vote:lock:" + userName
 	lockVal := "1" // 用于标识锁的持有者，可以是一个更复杂的标识，如UUID
 
 	startTime := time.Now()
@@ -60,7 +60,7 @@ func UpdateUserVotesWithLock(userName string) error {
 // SetValidateTicket 将有效票据缓存起来，设置过期时间以及使用次数
 func SetValidateTicket(ticketID string, maxVotes int, ticketUpdateTime time.Duration) error {
 	//maxVotesStr := fmt.Sprint(maxVotes)
-	ticketIDCache := fmt.Sprintf("ticketIDCache:%s", ticketID)
+	ticketIDCache := fmt.Sprintf("Voteme:ticketIDCache:%s", ticketID)
 	err := db.GetRedisCLi().Set(context.Background(), ticketIDCache, maxVotes, ticketUpdateTime).Err()
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func SetValidateTicket(ticketID string, maxVotes int, ticketUpdateTime time.Dura
 
 // DecreaseUsageLimit 减少键的使用次数，并检查是否达到上限或过期
 func DecreaseUsageLimit(ticketID string) error {
-	ticketIDCache := fmt.Sprintf("ticketIDCache:%s", ticketID)
+	ticketIDCache := fmt.Sprintf("Voteme:ticketIDCache:%s", ticketID)
 
 	// 使用DECR命令减少票据的可用次数
 	result, err := db.GetRedisCLi().Decr(context.Background(), ticketIDCache).Result()
@@ -89,12 +89,11 @@ func DecreaseUsageLimit(ticketID string) error {
 
 // GetVotesByName 获取某个选手的票数：这里是缓存，会有一定时延,导致数据不准确
 func GetVotesByName(name string) (int, error) {
-	votesStr, err := db.GetRedisCLi().Get(context.Background(), name).Result()
-
+	key := fmt.Sprintf("Voteme:current:votes:%s", name)
+	votesStr, err := db.GetRedisCLi().Get(context.Background(), key).Result()
 	if err == redis.Nil {
-		lockKey := "get:user:vote:lock:" + name // 使用不同的键作为锁
+		lockKey := "Voteme:get:user:vote:lock:" + name // 使用不同的键作为锁
 		lockValue := "1"
-
 		// 尝试获取锁
 		ok, err := db.GetRedisCLi().SetNX(context.Background(), lockKey, lockValue, 20*time.Millisecond).Result()
 		if err != nil {
@@ -108,7 +107,7 @@ func GetVotesByName(name string) (int, error) {
 				return 0, err
 			}
 			//fmt.Println("hit mysql---------")
-			db.GetRedisCLi().Set(context.Background(), name, votes, config.TicketCacheRefreshTime)
+			db.GetRedisCLi().Set(context.Background(), key, votes, config.TicketCacheRefreshTime)
 			return votes, nil
 		}
 
@@ -136,7 +135,7 @@ func GetVotesByName(name string) (int, error) {
 
 func VoteForUserRedis(userName string) error {
 	// 投票计数器的键
-	key := fmt.Sprintf("votes:%s", userName)
+	key := fmt.Sprintf("Voteme:votes:%s", userName)
 	// 增加用户的票数
 	_, err := db.GetRedisCLi().Incr(ctx, key).Result()
 	if err != nil {

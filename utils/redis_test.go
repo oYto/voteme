@@ -55,6 +55,16 @@ func TestVoteForUser(t *testing.T) {
 	wg.Wait()
 }
 
+//func TestGenerateRandomHash(t *testing.T) {
+//	hash, err := GenerateRandomHash(config.TicketLen)
+//	assert.Nil(t, err)
+//	t.Log(hash)
+//}
+
+//func TestDeleteKeysByPattern(t *testing.T) {
+//	deleteKeysByPattern("Voteme:*")
+//}
+
 //func TestGetAllUserNames(t *testing.T) {
 //	names, err := GetAllUserNames()
 //	assert.Nil(t, err)

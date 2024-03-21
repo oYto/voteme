@@ -10,13 +10,14 @@ import (
 )
 
 var (
-	config                   GlobalConfig  // 全局配置文件
-	once                     sync.Once     // 只执行一次的代码
-	MaxVotes                 int           // 票据最大使用次数
-	TicketsUpdateTime        time.Duration // 票据更新时间
-	updateDebounceTimer      *time.Timer   // 配置更新防抖动
-	TicketCacheRefreshTime   time.Duration // 票数缓存刷新时间
-	TickerCacheUsersVoteTime time.Duration
+	config                 GlobalConfig  // 全局配置文件
+	once                   sync.Once     // 只执行一次的代码
+	MaxVotes               int           // 票据最大使用次数
+	TicketsUpdateTime      time.Duration // 票据更新时间
+	updateDebounceTimer    *time.Timer   // 配置更新防抖动
+	TicketCacheRefreshTime time.Duration // 票数缓存刷新时间
+	VotesCacheToDbTime     time.Duration // redis中缓存数据的刷盘时间
+	TicketLen              int           // 票据长度
 )
 
 const debounceDuration = 1 * time.Second
@@ -71,8 +72,10 @@ func readConf() {
 	MaxVotes = viper.GetInt("maxVotes")
 	TicketsUpdateTime = viper.GetDuration("ticketUpdateTime")
 	TicketCacheRefreshTime = viper.GetDuration("ticketCacheRefreshTime")
-	TickerCacheUsersVoteTime = viper.GetDuration("tickerCacheUsersVoteTime")
-	fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，redis投票数据多久刷盘一次：%f\n", MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(), TickerCacheUsersVoteTime.Seconds())
+	VotesCacheToDbTime = viper.GetDuration("votesCacheToDbTime")
+	TicketLen = viper.GetInt("ticketLen")
+	fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，redis投票数据多久刷盘一次：%f，票据长度：%d \n",
+		MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(), VotesCacheToDbTime.Seconds(), TicketLen)
 	viper.WatchConfig() //监听配置文件的变化
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		if updateDebounceTimer != nil {
