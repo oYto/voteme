@@ -19,6 +19,7 @@ var (
 	VotesCacheToDbTime     time.Duration // redis中缓存数据的刷盘时间
 	TicketLen              int           // 票据长度
 	MinIdleCoons           int           // 最小空闲连接
+	GoGC                   int           // GoGc 步调
 )
 
 const debounceDuration = 1 * time.Second
@@ -77,6 +78,7 @@ func readConf() {
 	VotesCacheToDbTime = viper.GetDuration("votesCacheToDbTime")
 	TicketLen = viper.GetInt("ticketLen")
 	MinIdleCoons = viper.GetInt("min_idle_coons")
+	GoGC = viper.GetInt("goGc")
 	fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，"+
 		"redis投票数据多久刷盘一次：%f，票据长度：%d ，redis 最小空闲连接数：%d\n",
 		MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(),
@@ -94,9 +96,12 @@ func readConf() {
 			TicketCacheRefreshTime = viper.GetDuration("ticketCacheRefreshTime")
 			VotesCacheToDbTime = viper.GetDuration("votesCacheToDbTime")
 			TicketLen = viper.GetInt("ticketLen")
-			fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，redis投票数据多久刷盘一次：%f，票据长度：%d \n",
-				MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(), VotesCacheToDbTime.Seconds(), TicketLen)
-
+			MinIdleCoons = viper.GetInt("min_idle_coons")
+			GoGC = viper.GetInt("goGc")
+			fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，"+
+				"redis投票数据多久刷盘一次：%f，票据长度：%d ，redis 最小空闲连接数：%d\n",
+				MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(),
+				VotesCacheToDbTime.Seconds(), TicketLen, MinIdleCoons)
 		})
 	})
 }

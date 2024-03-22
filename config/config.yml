@@ -25,3 +25,5 @@ ticketUpdateTime: 100s # 一个票据的失效时间
 ticketLen: 10 # 票据最大长度
 ticketCacheRefreshTime: 2s # 票数缓存刷新时间
 votesCacheToDbTime: 2s # redis 中的投票数据，多久刷盘一次
+
+goGc: 1000 # go程序gc步调
