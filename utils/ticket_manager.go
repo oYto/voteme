@@ -51,7 +51,17 @@ func gracefulShutdown() {
 	if err != nil {
 		fmt.Printf("Clear failed, err: %s\n", err)
 	}
+	fmt.Println("Clear the Ticket Table...")
+	time.Sleep(time.Second)
+	cleanTicketTable()
 	os.Exit(0)
+}
+
+func cleanTicketTable() {
+	err := db.GetDB().Exec("TRUNCATE TABLE tickets").Error
+	if err != nil {
+		log.Fatalf("Failed to truncate table: %v", err)
+	}
 }
 
 // DeleteKeysByPattern 删除redis中前缀符合pattern的键值对
@@ -94,10 +104,10 @@ func ticketGenerator() {
 		log.Fatalf("createTicket to redis failed %s", err)
 	}
 	// 将当前有效的票据写入 mysql
-	err = control.CreateOrTicket(currentTicket)
-	if err != nil {
-		log.Fatalf("createTicket to mysql failed %s", err)
-	}
+	//err = control.CreateOrTicket(currentTicket)
+	//if err != nil {
+	//	log.Fatalf("createTicket to mysql failed %s", err)
+	//}
 	// 过期后，在这里重新生成票据
 	for range ticker.C { // 循环监听定时器的通道
 		ticketMutex.Lock()                                        // 在修改 currentTicket 之前加锁
@@ -110,11 +120,11 @@ func ticketGenerator() {
 		if err != nil {
 			log.Fatalf("createTicket to redis failed %s", err)
 		}
-		// 将当前有效的票据写入 mysql
-		err = control.CreateOrTicket(currentTicket)
-		if err != nil {
-			log.Fatalf("createTicket to mysql failed %s", err)
-		}
+		//// 将当前有效的票据写入 mysql
+		//err = control.CreateOrTicket(currentTicket)
+		//if err != nil {
+		//	log.Fatalf("createTicket to mysql failed %s", err)
+		//}
 
 		ticketMutex.Unlock() // 修改完成后解锁
 	}
@@ -168,9 +178,13 @@ func syncVotes() {
 	if err != nil {
 		log.Fatalf("getAllUserNames failed")
 	}
+	// 将 redis 中的 votes 逐个刷入mysql
 	for _, userName := range userNames {
 		key := fmt.Sprintf("Voteme:votes:%s", userName)
 		votes, err := db.GetRedisCLi().Get(context.Background(), key).Int()
+		if votes == 0 {
+			continue
+		}
 		if err == redis.Nil {
 			continue
 		} else if err != nil {
@@ -180,7 +194,32 @@ func syncVotes() {
 		}
 
 		// 在这里更新数据库中的票数
-		err = db.GetDB().Exec("UPDATE users SET votes =  ? WHERE name = ?", votes, userName).Error
+		// 开启一个事务
+		//tx := db.GetDB().Begin()
+		//
+		//// 尝试锁定特定用户的记录
+		//var votesCount int
+		//err = tx.Raw("SELECT votes FROM users WHERE name = ? FOR UPDATE", userName).Scan(&votesCount).Error
+		//if err != nil {
+		//	tx.Rollback() // 如果出现错误，回滚事务
+		//	fmt.Println("Locking failed during disk brushing:", err)
+		//}
+		//
+		//// 执行更新操作
+		//err = tx.Exec("UPDATE users SET votes = votes + ? WHERE name = ?", votes, userName).Error
+		//if err != nil {
+		//	tx.Rollback() // 如果更新失败，回滚事务
+		//	fmt.Println("Failed to update when brushing the disc：", err)
+		//}
+		//
+		//// 提交事务
+		//err = tx.Commit().Error
+		//if err != nil {
+		//	fmt.Println("Failed to submit transaction when brushing disk：", err)
+		//
+		//}
+
+		err = db.GetDB().Exec("UPDATE users SET votes = votes +  ? WHERE name = ?", votes, userName).Error
 		if err != nil {
 			// 处理错误
 			fmt.Println("Error updating votes in DB:", err)
@@ -188,10 +227,10 @@ func syncVotes() {
 		}
 
 		// 同步成功后，重置Redis中的计数器
-		//err = db.GetRedisCLi().DecrBy(context.Background(), key, int64(votes)).Err()
-		//if err != nil {
-		//
-		//}
+		err = db.GetRedisCLi().DecrBy(context.Background(), key, int64(votes)).Err()
+		if err != nil {
+
+		}
 	}
 }
 
@@ -200,7 +239,7 @@ func getDbVotesToRedis() error {
 	var users []model.User
 
 	// 从数据库中查询所有用户的name和votes字段
-	if err := db.GetDB().Select("name", "votes").Find(&users).Error; err != nil {
+	if err := db.GetDB().Select("name").Find(&users).Error; err != nil {
 		return err
 	}
 
@@ -219,16 +258,26 @@ func getDbVotesToRedis() error {
 
 // 获取数据库中所有名字
 func getAllUserNames() ([]string, error) {
-	var users []model.User
 	var userNames []string
 
-	if err := db.GetDB().Find(&users).Error; err != nil {
+	if err := db.GetDB().Model(&model.User{}).Select("name").Find(&userNames).Error; err != nil {
 		return nil, err
-	}
-	// 提取用户名
-	for _, user := range users {
-		userNames = append(userNames, user.Name)
 	}
 
 	return userNames, nil // 返回用户名列表
 }
+
+//func getAllUserNames() ([]string, error) {
+//	var users []model.User
+//	var userNames []string
+//
+//	if err := db.GetDB().Find(&users).Error; err != nil {
+//		return nil, err
+//	}
+//	// 提取用户名
+//	for _, user := range users {
+//		userNames = append(userNames, user.Name)
+//	}
+//
+//	return userNames, nil // 返回用户名列表
+//}

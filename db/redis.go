@@ -18,10 +18,11 @@ func initRedis() {
 	redisConfig := config.GetGlobalConf().RedisConfig
 	addr := fmt.Sprintf("%s:%d", redisConfig.Host, redisConfig.Port)
 	redisConn = redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: redisConfig.PassWord,
-		DB:       redisConfig.DB,
-		PoolSize: redisConfig.PoolSile,
+		Addr:         addr,
+		Password:     redisConfig.PassWord,
+		DB:           redisConfig.DB,
+		PoolSize:     redisConfig.PoolSile,
+		MinIdleConns: config.MinIdleCoons,
 	})
 
 	// 连接测试以确保与 Redis 服务器的通信正常。

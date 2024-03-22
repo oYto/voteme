@@ -18,6 +18,7 @@ var (
 	TicketCacheRefreshTime time.Duration // 票数缓存刷新时间
 	VotesCacheToDbTime     time.Duration // redis中缓存数据的刷盘时间
 	TicketLen              int           // 票据长度
+	MinIdleCoons           int           // 最小空闲连接
 )
 
 const debounceDuration = 1 * time.Second
@@ -40,11 +41,12 @@ type DbConf struct {
 
 // RedisConf 配置
 type RedisConf struct {
-	Host     string `yaml:"rhost" mapstructure:"rhost"`       // db主机地址
-	Port     int    `yaml:"rport" mapstructure:"rport"`       // db端口
-	DB       int    `yaml:"rdb" mapstructure:"rdb"`           // 数据库
-	PassWord string `yaml:"passwd" mapstructure:"passwd"`     // 密码
-	PoolSile int    `yaml:"poolsize" mapstructure:"poolsize"` // 连接池大小，即最大连接数
+	Host        string `yaml:"rhost" mapstructure:"rhost"`                   // db主机地址
+	Port        int    `yaml:"rport" mapstructure:"rport"`                   // db端口
+	DB          int    `yaml:"rdb" mapstructure:"rdb"`                       // 数据库
+	PassWord    string `yaml:"passwd" mapstructure:"passwd"`                 // 密码
+	PoolSile    int    `yaml:"poolsize" mapstructure:"poolsize"`             // 连接池大小，即最大连接数
+	MinIdleConn int    `yaml:"min_idle_coons" mapstructure:"min_idle_coons"` // 最小空闲连接
 }
 
 func GetGlobalConf() *GlobalConfig {
@@ -74,8 +76,11 @@ func readConf() {
 	TicketCacheRefreshTime = viper.GetDuration("ticketCacheRefreshTime")
 	VotesCacheToDbTime = viper.GetDuration("votesCacheToDbTime")
 	TicketLen = viper.GetInt("ticketLen")
-	fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，redis投票数据多久刷盘一次：%f，票据长度：%d \n",
-		MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(), VotesCacheToDbTime.Seconds(), TicketLen)
+	MinIdleCoons = viper.GetInt("min_idle_coons")
+	fmt.Printf("票据最大使用次数：%d, 票据更新时间：%fs，票数缓存失效时间：%fs，"+
+		"redis投票数据多久刷盘一次：%f，票据长度：%d ，redis 最小空闲连接数：%d\n",
+		MaxVotes, TicketsUpdateTime.Seconds(), TicketCacheRefreshTime.Seconds(),
+		VotesCacheToDbTime.Seconds(), TicketLen, MinIdleCoons)
 	viper.WatchConfig() //监听配置文件的变化
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		if updateDebounceTimer != nil {
