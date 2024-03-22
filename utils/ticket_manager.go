@@ -11,10 +11,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"log"
 	"math/rand"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -22,40 +19,6 @@ var (
 	currentTicket string     // 存储当前有效的票据
 	ticketMutex   sync.Mutex // ticketMutex是一个互斥锁，用于控制对currentTicket变量的并发访问
 )
-
-// Init 初始化票据生成器
-func init() {
-	rand.Seed(time.Now().UnixNano())
-	// 收尾工作：让 redis 中缓存的投票数，能够刷盘；将redis中缓存的东西清除
-	go gracefulShutdown()
-	// 生成票据
-	go ticketGenerator()
-	// 数据库中的信息预存到 redis 中
-	getDbVotesToRedis()
-	// 将redis中的数据累加到mysql中
-	go syncVotesToDB()
-}
-
-// GracefulShutdown 执行最后的收尾工作
-func gracefulShutdown() {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	// 保证redis中新增投票能够刷盘
-	fmt.Println("VotesCacheToDb......")
-	time.Sleep(config.VotesCacheToDbTime)
-	// 所有工作完成后，将数据库缓存清除
-	fmt.Println("Clear the cache related to Voteme ......")
-	time.Sleep(time.Second)
-	err := deleteKeysByPattern("Voteme:*")
-	if err != nil {
-		fmt.Printf("Clear failed, err: %s\n", err)
-	}
-	fmt.Println("Clear the Ticket Table...")
-	time.Sleep(time.Second)
-	cleanTicketTable()
-	os.Exit(0)
-}
 
 func cleanTicketTable() {
 	err := db.GetDB().Exec("TRUNCATE TABLE tickets").Error
@@ -91,7 +54,7 @@ func deleteKeysByPattern(pattern string) error {
 // todo 这里为了方便测试，设置了20秒，后续改为需求中的2s
 func ticketGenerator() {
 	var err error
-	currentTicket, err = generateRandomHash(10)
+	currentTicket, err = generateRandomHash(config.TicketLen)
 	if err != nil {
 		log.Fatalf("GenerateRandomHash failed %s", err)
 
@@ -103,11 +66,11 @@ func ticketGenerator() {
 	if err != nil {
 		log.Fatalf("createTicket to redis failed %s", err)
 	}
-	// 将当前有效的票据写入 mysql
-	//err = control.CreateOrTicket(currentTicket)
-	//if err != nil {
-	//	log.Fatalf("createTicket to mysql failed %s", err)
-	//}
+	//将当前有效的票据写入 mysql
+	err = control.CreateOrTicket(currentTicket)
+	if err != nil {
+		log.Fatalf("createTicket to mysql failed %s", err)
+	}
 	// 过期后，在这里重新生成票据
 	for range ticker.C { // 循环监听定时器的通道
 		ticketMutex.Lock()                                        // 在修改 currentTicket 之前加锁
@@ -121,14 +84,15 @@ func ticketGenerator() {
 			log.Fatalf("createTicket to redis failed %s", err)
 		}
 		//// 将当前有效的票据写入 mysql
-		//err = control.CreateOrTicket(currentTicket)
-		//if err != nil {
-		//	log.Fatalf("createTicket to mysql failed %s", err)
-		//}
+		err = control.CreateOrTicket(currentTicket)
+		if err != nil {
+			log.Fatalf("createTicket to mysql failed %s", err)
+		}
 
 		ticketMutex.Unlock() // 修改完成后解锁
 	}
 }
+
 func generateRandomHash(n int) (string, error) {
 	// 生成足够的随机字节，由于转换成16进制后长度会翻倍，所以这里除以2
 	bytes := make([]byte, n/2)
@@ -160,15 +124,6 @@ func generateRandomHash(n int) (string, error) {
 // GetCurrentTicket GetCurrentTicket函数返回当前有效的票据
 func GetCurrentTicket() string {
 	return currentTicket // 返回当前有效的票据
-}
-
-func syncVotesToDB() {
-	ticker := time.NewTicker(config.VotesCacheToDbTime) // 每一定时间间隔刷盘一次
-	defer ticker.Stop()
-
-	for range ticker.C {
-		syncVotes()
-	}
 }
 
 // 将redis中的票数同步到数据库中
@@ -232,28 +187,6 @@ func syncVotes() {
 
 		}
 	}
-}
-
-// GetDbVotesToRedis 项目启动时，自动将数据库中的用户投票数据同步到Redis
-func getDbVotesToRedis() error {
-	var users []model.User
-
-	// 从数据库中查询所有用户的name和votes字段
-	if err := db.GetDB().Select("name").Find(&users).Error; err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-
-	// 遍历用户数据，将每个用户的投票数同步到Redis
-	for _, user := range users {
-		// 使用用户的votes:name作为键，votes作为值
-		key := fmt.Sprintf("Voteme:votes:%s", user.Name)
-		if err := db.GetRedisCLi().Set(ctx, key, user.Votes, 0).Err(); err != nil {
-			return fmt.Errorf("failed to set Redis key for user %s: %v", user.Name, err)
-		}
-	}
-	return nil
 }
 
 // 获取数据库中所有名字

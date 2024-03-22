@@ -21,7 +21,7 @@ redis:
   min_idle_coons: 100
 
 maxVotes: 100000 # 一个票据最大投票次数
-ticketUpdateTime: 100s # 一个票据的失效时间
+ticketUpdateTime: 2s # 一个票据的失效时间
 ticketLen: 10 # 票据最大长度
 ticketCacheRefreshTime: 2s # 票数缓存刷新时间
 votesCacheToDbTime: 2s # redis 中的投票数据，多久刷盘一次
